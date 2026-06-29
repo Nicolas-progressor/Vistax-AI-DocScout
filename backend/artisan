@@ -2,28 +2,23 @@
 <?php
 
 use Illuminate\Foundation\Application;
-use Illuminate\Foundation\Console\Kernel;
-use Illuminate\Events\Dispatcher;
+use Illuminate\Foundation\Configuration\Exceptions;
+use Illuminate\Foundation\Configuration\Middleware;
 
 define('LARAVEL_START', microtime(true));
 
-// 1. Подключаем автозагрузчик Composer
-if (file_exists(__DIR__.'/vendor/autoload.php')) {
-    require __DIR__.'/vendor/autoload.php';
-} elseif (file_exists(__DIR__.'/../vendor/autoload.php')) {
-    require __DIR__.'/../vendor/autoload.php';
-} else {
-    fwrite(STDERR, "Composer autoload file not found.\n");
-    exit(1);
-}
+// Register the Composer autoloader
+require __DIR__.'/vendor/autoload.php';
 
-// 2. Инициализируем приложение
+// Bootstrap Laravel
 $app = require_once __DIR__.'/bootstrap/app.php';
 
-// 3. Инициализируем ядро Laravel 12 (Передаем ДВА аргумента: $app и Dispatcher)
-$kernel = new Kernel($app, $app->make(Dispatcher::class));
+// Run the Artisan application
+$kernel = new Illuminate\Foundation\Console\Kernel(
+    $app,
+    $app->make(Illuminate\Contracts\Events\Dispatcher::class)
+);
 
-// 4. Запускаем консольную команду
 $status = $kernel->handle(
     $input = new Symfony\Component\Console\Input\ArgvInput,
     new Symfony\Component\Console\Output\ConsoleOutput

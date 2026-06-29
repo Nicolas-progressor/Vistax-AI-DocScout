@@ -47,10 +47,15 @@ class DocumentController extends Controller
             // Продление TTL напрямую в Redis (Highload-style, ~0.1мс)
             Redis::expire(config('cache.prefix') . $cacheKey, 604800); // 7 дней в секундах
             
+            // Сохраняем последний использованный preset для этого документа
+            $presetCacheKey = "doc_preset:{$cachedData['id']}";
+            Cache::put($presetCacheKey, $preset, now()->addDays(7));
+            
             return response()->json([
                 'id' => $cachedData['id'],
                 'file_name' => $cachedData['file_name'],
                 'cached' => true,
+                'last_preset' => $preset,
             ]);
         }
         
@@ -70,10 +75,15 @@ class DocumentController extends Controller
             'file_name' => $document->file_name,
         ], now()->addDays(7));
         
+        // Сохраняем последний использованный preset
+        $presetCacheKey = "doc_preset:{$document->id}";
+        Cache::put($presetCacheKey, $preset, now()->addDays(7));
+        
         return response()->json([
             'id' => $document->id,
             'file_name' => $document->file_name,
             'cached' => false,
+            'last_preset' => $preset,
         ]);
     }
     
@@ -134,11 +144,16 @@ class DocumentController extends Controller
         $analyses = DocumentAnalysis::where('document_id', $document)
             ->get(['id', 'preset', 'ai_model', 'result_text', 'created_at', 'updated_at']);
         
+        // Получаем последний использованный preset
+        $presetCacheKey = "doc_preset:{$document}";
+        $lastPreset = Cache::get($presetCacheKey, 'legal_audit');
+        
         return response()->json([
             'id' => $documentModel->id,
             'file_name' => $documentModel->file_name,
             'raw_text' => $documentModel->raw_text,
             'created_at' => $documentModel->created_at->toIso8601String(),
+            'last_preset' => $lastPreset,
             'analyses' => $analyses->map(fn($analysis) => [
                 'id' => $analysis->id,
                 'preset' => $analysis->preset,
@@ -169,6 +184,34 @@ class DocumentController extends Controller
     }
         
     /**
+     * Удаление документа
+     */
+    public function destroy(int $document): JsonResponse
+    {
+        $documentModel = Document::findOrFail($document);
+        
+        // Удаляем файл из storage
+        if (file_exists($documentModel->file_path)) {
+            unlink($documentModel->file_path);
+        }
+        
+        // Удаляем запись из БД (анализы удалятся каскадом)
+        $documentModel->delete();
+        
+        // Очищаем кэш
+        $cacheKey = "doc_analysis:{$documentModel->file_hash}";
+        Cache::forget($cacheKey);
+        
+        $presetCacheKey = "doc_preset:{$document}";
+        Cache::forget($presetCacheKey);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Документ успешно удалён',
+        ]);
+    }
+    
+    /**
      * Чат с документом (вопрос-ответ с SSE-стримингом)
      */
     public function chat(Request $request, int $document): StreamedResponse
@@ -192,3 +235,4 @@ PROMPT;
         return $this->ollamaService->streamChat($prompt);
     }
 }
+    

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useDocumentStore } from '@/stores/documentStore'
 import FileUpload from '@/components/FileUpload.vue'
 import AnalysisPanel from '@/components/AnalysisPanel.vue'
@@ -14,6 +14,13 @@ const selectedPreset = ref<'legal_audit' | 'invoice_check' | 'free_chat'>('legal
 const showAnalysis = ref(false)
 const activeTab = ref<'analysis' | 'chat'>('analysis')
 const isSidebarCollapsed = ref(false)
+
+// Синхронизируем selectedPreset с lastUsedPreset из store
+watch(() => documentStore.lastUsedPreset, (newPreset) => {
+  if (newPreset) {
+    selectedPreset.value = newPreset
+  }
+}, { immediate: true })
 
 const presetTabs = [
   { id: 'legal_audit', label: 'Юридический аудит', description: 'Поиск рисков и кабальных условий', icon: '⚖️', color: 'blue' },

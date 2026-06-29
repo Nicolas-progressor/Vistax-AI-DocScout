@@ -10,6 +10,7 @@ const emit = defineEmits<{
 
 // Кэш статусов анализа: { [docId]: { legal_audit: boolean, invoice_check: boolean, free_chat: boolean } }
 const analysisStatus = ref<Record<number, Record<string, boolean>>>({})
+const deletingId = ref<number | null>(null)
 
 onMounted(async () => {
   if (documentStore.documentList.length === 0) {
@@ -42,6 +43,25 @@ async function loadAnalysisStatus(id: number) {
     analysisStatus.value[id] = status
   } catch (e) {
     console.error('Failed to load analysis status:', e)
+  }
+}
+
+async function handleDelete(id: number, fileName: string, event: Event) {
+  event.stopPropagation()
+  
+  if (!confirm(`Удалить документ "${fileName}"? Это действие нельзя отменить.`)) {
+    return
+  }
+  
+  deletingId.value = id
+  
+  try {
+    await documentStore.deleteDocument(id)
+  } catch (e) {
+    console.error('Delete error:', e)
+    alert('Ошибка при удалении документа')
+  } finally {
+    deletingId.value = null
   }
 }
 
@@ -104,36 +124,84 @@ function getStatusIcon(docId: number): string {
 
       <!-- Document Items -->
       <div v-else class="space-y-1.5">
-        <button
+        <div
           v-for="doc in documentStore.documentList"
           :key="doc.id"
-          @click="() => { handleSelect(doc.id); loadAnalysisStatus(doc.id) }"
-          class="w-full p-3 text-left rounded-lg transition-all hover:bg-gray-50 group"
-          :class="[
-            documentStore.currentDocument?.id === doc.id
-              ? 'bg-blue-50 ring-2 ring-blue-200'
-              : '',
-          ]"
+          class="group relative"
         >
-          <div class="flex items-start space-x-3">
-            <span class="text-2xl flex-shrink-0 mt-0.5">
-              {{ getIcon(doc.file_name) }}
-            </span>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center justify-between">
-                <p class="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600 transition-colors">
-                  {{ doc.file_name }}
+          <!-- Document Button -->
+          <button
+            @click="() => { handleSelect(doc.id); loadAnalysisStatus(doc.id) }"
+            class="w-full p-3 text-left rounded-lg transition-all hover:bg-gray-50"
+            :class="[
+              documentStore.currentDocument?.id === doc.id
+                ? 'bg-blue-50 ring-2 ring-blue-200'
+                : '',
+            ]"
+          >
+            <div class="flex items-start space-x-3">
+              <span class="text-2xl flex-shrink-0 mt-0.5">
+                {{ getIcon(doc.file_name) }}
+              </span>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between">
+                  <p class="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                    {{ doc.file_name }}
+                  </p>
+                  <span class="text-xs ml-2 flex-shrink-0">
+                    {{ getStatusIcon(doc.id) }}
+                  </span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">
+                  {{ doc.created_at_formatted }}
                 </p>
-                <span class="text-xs ml-2 flex-shrink-0">
-                  {{ getStatusIcon(doc.id) }}
-                </span>
               </div>
-              <p class="text-xs text-gray-500 mt-1">
-                {{ doc.created_at_formatted }}
-              </p>
             </div>
-          </div>
-        </button>
+          </button>
+          
+          <!-- Delete Button -->
+          <button
+            @click="(e) => handleDelete(doc.id, doc.file_name, e)"
+            :disabled="deletingId === doc.id"
+            class="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 disabled:opacity-50"
+            title="Удалить документ"
+          >
+            <svg
+              v-if="deletingId !== doc.id"
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+            <svg
+              v-else
+              class="w-4 h-4 animate-spin"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              />
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   </div>

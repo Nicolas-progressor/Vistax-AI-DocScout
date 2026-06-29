@@ -5,10 +5,10 @@ import axios from 'axios'
 export interface Document {
   id: number
   file_name: string
-  raw_text?: string
+  raw_text: string
+  created_at: string
   cached?: boolean
-  created_at?: string
-  created_at_formatted?: string
+  last_preset?: 'legal_audit' | 'invoice_check' | 'free_chat'
 }
 
 export interface DocumentListItem {
@@ -81,6 +81,11 @@ export const useDocumentStore = defineStore('document', () => {
         },
       })
 
+      // Сохраняем last_preset если пришёл в ответе
+      if (response.data.last_preset) {
+        lastUsedPreset.value = response.data.last_preset
+      }
+
       // Получаем полную информацию о документе с raw_text
       await fetchDocument(response.data.id)
       
@@ -125,7 +130,7 @@ export const useDocumentStore = defineStore('document', () => {
       if (response.data.analyses && response.data.analyses.length > 0) {
         savedAnalyses.value = response.data.analyses
         
-        // Восстанавливаем последний использованный пресет
+        // Восстанавливаем последний использованный пресет по последнему анализу
         const lastAnalysis = response.data.analyses
           .sort((a: SavedAnalysis, b: SavedAnalysis) => 
             new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
@@ -133,6 +138,9 @@ export const useDocumentStore = defineStore('document', () => {
         if (lastAnalysis) {
           lastUsedPreset.value = lastAnalysis.preset
         }
+      } else if (response.data.last_preset) {
+        // Если анализов нет, но есть last_preset от сервера (для дубликатов)
+        lastUsedPreset.value = response.data.last_preset
       }
     } catch (e: any) {
       error.value = e.response?.data?.message || 'Ошибка загрузки документа'
@@ -434,6 +442,27 @@ export const useDocumentStore = defineStore('document', () => {
     return savedAnalyses.value.some(a => a.preset === preset)
   }
 
+  async function deleteDocument(id: number): Promise<void> {
+    error.value = null
+
+    try {
+      await axios.delete(`/api/documents/${id}`)
+      
+      // Удаляем из списка
+      documentList.value = documentList.value.filter(doc => doc.id !== id)
+      
+      // Если удалили текущий документ — сбрасываем
+      if (currentDocument.value?.id === id) {
+        reset()
+        resetChat()
+        savedAnalyses.value = []
+      }
+    } catch (e: any) {
+      error.value = e.response?.data?.message || 'Ошибка удаления документа'
+      throw e
+    }
+  }
+
   return {
     // State
     currentDocument,
@@ -459,5 +488,6 @@ export const useDocumentStore = defineStore('document', () => {
     resetChat,
     getSavedAnalysis,
     hasSavedAnalysis,
+    deleteDocument,
   }
 })

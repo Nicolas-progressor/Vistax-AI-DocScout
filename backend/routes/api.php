@@ -23,3 +23,6 @@ Route::get('/documents/{document:int}/analyze', [DocumentController::class, 'ana
 
 // Чат с документом (вопрос-ответ, SSE-стриминг)
 Route::post('/documents/{document:int}/chat', [DocumentController::class, 'chat']);
+
+// Удаление документа
+Route::delete('/documents/{document:int}', [DocumentController::class, 'destroy']);

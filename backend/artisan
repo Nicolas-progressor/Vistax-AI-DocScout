@@ -7,13 +7,12 @@ define('LARAVEL_START', microtime(true));
 require __DIR__.'/vendor/autoload.php';
 
 // Bootstrap Laravel
-$status = require_once __DIR__.'/bootstrap/app.php';
+$app = require_once __DIR__.'/bootstrap/app.php';
 
 // Run the Artisan application
 $kernel = new Illuminate\Foundation\Console\Kernel(
-    new Illuminate\Foundation\Application(
-        dirname(__DIR__)
-    )
+    $app,
+    new Illuminate\Events\Dispatcher($app)
 );
 
 $status = $kernel->handle(

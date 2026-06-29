@@ -1,0 +1,19 @@
+#!/bin/sh
+
+# Устанавливаем правильные права на storage и cache
+# Это нужно потому что volumes из хоста перекрывают права контейнера
+chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+
+# Генерируем ключ если не существует
+if [ ! -f .env ] || [ -z "$APP_KEY" ]; then
+    echo "APP_KEY не найден, генерируем..."
+    php artisan key:generate --force
+fi
+
+# Запускаем миграции если БД доступна
+echo "Проверка подключения к БД..."
+php artisan migrate --force
+
+# Запускаем PHP-FPM
+exec php-fpm

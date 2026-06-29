@@ -59,18 +59,40 @@ class FileParserService
     }
     
     /**
-     * Парсинг PDF файлов (через smalot/pdfparser)
+     * Парсинг PDF файлов
+     * Приоритет: pdftotext (poppler) → smalot/pdfparser (PHP)
      */
     private function parsePdf(UploadedFile $file): string
     {
-        if (!class_exists(\Smalot\PdfParser\Parser::class)) {
-            throw new \RuntimeException('PDF парсер не установлен. Выполните: composer require smalot/pdfparser');
+        // Метод 1: pdftotext (быстрый, системный)
+        if (function_exists('shell_exec')) {
+            $tempFile = tempnam(sys_get_temp_dir(), 'pdf_');
+            shell_exec("pdftotext -layout -enc UTF-8 " . escapeshellarg($file->getRealPath()) . " " . escapeshellarg($tempFile));
+            
+            if (file_exists($tempFile)) {
+                $text = file_get_contents($tempFile);
+                unlink($tempFile);
+                
+                if (trim($text) !== '') {
+                    return $text;
+                }
+            }
         }
         
-        $parser = new \Smalot\PdfParser\Parser();
-        $pdf = $parser->parseFile($file->getRealPath());
+        // Метод 2: smalot/pdfparser (медленный, PHP)
+        if (class_exists(\Smalot\PdfParser\Parser::class)) {
+            try {
+                $parser = new \Smalot\PdfParser\Parser();
+                $pdf = $parser->parseFile($file->getRealPath());
+                return $pdf->getText();
+            } catch (\Exception $e) {
+                // Fallback
+            }
+        }
         
-        return $pdf->getText();
+        throw new \RuntimeException(
+            'Не удалось распарсить PDF. Установите poppler-utils или smalot/pdfparser'
+        );
     }
     
     /**

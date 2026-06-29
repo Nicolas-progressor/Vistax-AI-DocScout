@@ -1,0 +1,32 @@
+#!/usr/bin/env php
+<?php
+
+define('LARAVEL_START', microtime(true));
+
+// Register the Composer autoloader
+require __DIR__.'/vendor/autoload.php';
+
+// Bootstrap Laravel
+$status = require_once __DIR__.'/bootstrap/app.php';
+
+// Run the Artisan application
+$kernel = new Illuminate\Foundation\Console\Kernel(
+    new Illuminate\Foundation\Application(
+        dirname(__DIR__)
+    )
+);
+
+$status = $kernel->handle(
+    $input = new Symfony\Component\Console\Input\ArgvInput,
+    new Symfony\Component\Console\Output\ConsoleOutput
+);
+
+/*
+|--------------------------------------------------------------------------
+| Exit The Application
+|--------------------------------------------------------------------------
+*/
+
+$kernel->terminate($input, $status);
+
+exit($status);

@@ -92,6 +92,7 @@ services:
     container_name: vistax-frontend
     volumes:
       - ./frontend:/app
+      - /app/node_modules  # Анонимный volume для node_modules (спасает от перекрытия)
     ports:
       - "5173:5173"
     environment:

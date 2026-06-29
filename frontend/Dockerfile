@@ -6,10 +6,10 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies (внутри контейнера, не на хосте)
+# Install dependencies
 RUN npm install
 
-# Copy application files
+# Copy application files (кроме node_modules)
 COPY . .
 
 # Expose port

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch, WatchStopHandle } from 'vue'
 import { useDocumentStore } from '@/stores/documentStore'
 import FileUpload from '@/components/FileUpload.vue'
 import AnalysisPanel from '@/components/AnalysisPanel.vue'
@@ -54,6 +54,50 @@ function handleDocumentSelect() {
 function toggleSidebar() {
   isSidebarCollapsed.value = !isSidebarCollapsed.value
 }
+
+// Индикаторы состояния анализа для каждого пресета
+const analyzingPresets = ref<Set<string>>(new Set())
+
+function getPresetLabel(presetId: string): string {
+  const preset = presetTabs.find(p => p.id === presetId)
+  return preset?.label || presetId
+}
+
+function hasSavedAnalysis(presetId: string): boolean {
+  return documentStore.hasSavedAnalysis(presetId)
+}
+
+function isAnalyzingPreset(presetId: string): boolean {
+  return analyzingPresets.value.has(presetId)
+}
+
+async function changePreset(newPreset: 'legal_audit' | 'invoice_check' | 'free_chat') {
+  // Если уже выбран этот пресет — ничего не делаем
+  if (selectedPreset.value === newPreset) return
+  
+  // Переключаем пресет
+  selectedPreset.value = newPreset
+  
+  // Переключаем вкладку на анализ (не на чат)
+  activeTab.value = 'analysis'
+  
+  // Если для этого пресета уже есть анализ — просто показываем его (AnalysisPanel сам обработает)
+  // Если нет — запускаем анализ (тоже автоматически через AnalysisPanel)
+}
+
+// Watch за изменением currentDocument для сброса состояния анализа
+watch(() => documentStore.currentDocument?.id, () => {
+  analyzingPresets.value.clear()
+})
+
+// Watch за состоянием анализа из store
+watch(() => documentStore.analysisResult.isStreaming, (isStreaming) => {
+  if (isStreaming) {
+    analyzingPresets.value.add(selectedPreset.value)
+  } else {
+    analyzingPresets.value.delete(selectedPreset.value)
+  }
+})
 </script>
 
 <template>
@@ -204,41 +248,101 @@ function toggleSidebar() {
             </div>
           </div>
 
-          <!-- Analysis Section -->
-          <div v-else class="max-w-[1600px] mx-auto h-full">
-            <div class="grid grid-cols-12 gap-6">
-              <!-- Document Info Column -->
-              <div class="col-span-12 lg:col-span-5 space-y-4">
-                <!-- Document Metadata -->
-                <div class="bg-white/80 backdrop-blur rounded-2xl shadow-lg border border-gray-200/50 p-6 hover:shadow-xl transition-shadow duration-300">
-                  <div class="flex items-center space-x-3 mb-5">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-md">
-                      📄
-                    </div>
-                    <h3 class="font-bold text-lg text-gray-900">О документе</h3>
+        <!-- Analysis Section -->
+        <div v-else class="max-w-[1600px] mx-auto h-full">
+          <div class="grid grid-cols-12 gap-6">
+            <!-- Document Info Column -->
+            <div class="col-span-12 lg:col-span-5 space-y-4">
+              <!-- Document Metadata -->
+              <div class="bg-white/80 backdrop-blur rounded-2xl shadow-lg border border-gray-200/50 p-6 hover:shadow-xl transition-shadow duration-300">
+                <div class="flex items-center space-x-3 mb-5">
+                  <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-md">
+                    📄
                   </div>
-                  <div class="space-y-0 divide-y divide-gray-100">
-                    <div class="flex justify-between py-3">
-                      <span class="text-gray-500 text-sm">Файл</span>
-                      <span class="text-gray-900 font-medium text-sm text-right max-w-[200px] truncate">{{ documentStore.currentDocument?.file_name }}</span>
-                    </div>
-                    <div class="flex justify-between py-3">
-                      <span class="text-gray-500 text-sm">ID</span>
-                      <span class="text-gray-900 font-mono text-sm bg-gray-100 px-2 py-0.5 rounded">{{ documentStore.currentDocument?.id }}</span>
-                    </div>
-                    <div class="flex justify-between py-3">
-                      <span class="text-gray-500 text-sm">Статус</span>
-                      <span
-                        class="px-3 py-1 rounded-full text-xs font-bold"
-                        :class="documentStore.currentDocument?.cached
-                          ? 'bg-gradient-to-r from-green-400 to-green-500 text-white shadow-sm'
-                          : 'bg-gradient-to-r from-blue-400 to-blue-500 text-white shadow-sm'"
-                      >
-                        {{ documentStore.currentDocument?.cached ? '✓ Из кэша' : '✨ Новый' }}
-                      </span>
-                    </div>
+                  <h3 class="font-bold text-lg text-gray-900">О документе</h3>
+                </div>
+                <div class="space-y-0 divide-y divide-gray-100">
+                  <div class="flex justify-between py-3">
+                    <span class="text-gray-500 text-sm">Файл</span>
+                    <span class="text-gray-900 font-medium text-sm text-right max-w-[200px] truncate">{{ documentStore.currentDocument?.file_name }}</span>
+                  </div>
+                  <div class="flex justify-between py-3">
+                    <span class="text-gray-500 text-sm">ID</span>
+                    <span class="text-gray-900 font-mono text-sm bg-gray-100 px-2 py-0.5 rounded">{{ documentStore.currentDocument?.id }}</span>
+                  </div>
+                  <div class="flex justify-between py-3">
+                    <span class="text-gray-500 text-sm">Статус</span>
+                    <span
+                      class="px-3 py-1 rounded-full text-xs font-bold"
+                      :class="documentStore.currentDocument?.cached
+                        ? 'bg-gradient-to-r from-green-400 to-green-500 text-white shadow-sm'
+                        : 'bg-gradient-to-r from-blue-400 to-blue-500 text-white shadow-sm'"
+                    >
+                      {{ documentStore.currentDocument?.cached ? '✓ Из кэша' : '✨ Новый' }}
+                    </span>
+                  </div>
+                  <div class="flex justify-between py-3">
+                    <span class="text-gray-500 text-sm">Тип анализа</span>
+                    <span class="text-gray-900 font-medium text-sm text-right">
+                      {{ getPresetLabel(selectedPreset) }}
+                    </span>
                   </div>
                 </div>
+                
+                <!-- Preset Switcher -->
+                <div class="mt-5 pt-5 border-t border-gray-100">
+                  <p class="text-xs font-semibold text-gray-600 mb-3 uppercase tracking-wide">
+                    Изменить тип анализа
+                  </p>
+                  <div class="space-y-2">
+                    <button
+                      v-for="preset in presetTabs"
+                      :key="preset.id"
+                      @click="changePreset(preset.id)"
+                      class="w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all duration-300 hover:shadow-md"
+                      :class="[
+                        selectedPreset === preset.id
+                          ? `border-${preset.color}-500 bg-gradient-to-r from-${preset.color}-50 to-white ring-1 ring-${preset.color}-200 shadow-sm`
+                          : 'border-gray-200 bg-white hover:border-gray-300',
+                      ]"
+                    >
+                      <div class="flex items-center space-x-3">
+                        <span class="text-xl">{{ preset.icon }}</span>
+                        <div class="text-left">
+                          <p class="text-sm font-semibold text-gray-900">{{ preset.label }}</p>
+                        </div>
+                      </div>
+                      <div class="flex items-center space-x-2">
+                        <!-- Индикатор наличия анализа -->
+                        <span
+                          v-if="hasSavedAnalysis(preset.id)"
+                          class="text-xs font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded-full"
+                        >
+                          ✓ Готов
+                        </span>
+                        <span
+                          v-else-if="isAnalyzingPreset(preset.id)"
+                          class="text-xs font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full flex items-center"
+                        >
+                          <svg class="animate-spin h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Анализ...
+                        </span>
+                        <svg
+                          v-if="selectedPreset === preset.id"
+                          class="w-5 h-5 text-blue-600"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                        </svg>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </div>
                 
                 <!-- Raw Text -->
                 <div class="bg-white/80 backdrop-blur rounded-2xl shadow-lg border border-gray-200/50 p-6 hover:shadow-xl transition-shadow duration-300">

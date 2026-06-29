@@ -13,7 +13,11 @@ fi
 
 # Запускаем миграции если БД доступна
 echo "Проверка подключения к БД..."
-php artisan migrate --force
+php artisan migrate --force || true
 
-# Запускаем PHP-FPM
+# Оптимизация кэша (не критично если упадет)
+php artisan config:cache || true
+php artisan route:cache || true
+
+# Запускаем PHP-FPM (основной процесс)
 exec php-fpm

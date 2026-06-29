@@ -28,6 +28,9 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Copy application files
 COPY . .
 
+# Configure PHP-FPM to listen on TCP port
+RUN sed -i 's/listen = \/var\/run\/php\/php-fpm.sock/listen = 0.0.0.0:9000/' /usr/local/etc/php-fpm.d/www.conf
+
 # Create required directories
 RUN mkdir -p bootstrap/cache storage/framework/{sessions,views,cache}
 

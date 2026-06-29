@@ -44,6 +44,7 @@ services:
     working_dir: /var/www/html
     volumes:
       - ./backend:/var/www/html:cached
+      - /var/www/html/vendor  # Анонимный volume для vendor (не перекрывать)
     environment:
       APP_ENV: local
       APP_DEBUG: "true"

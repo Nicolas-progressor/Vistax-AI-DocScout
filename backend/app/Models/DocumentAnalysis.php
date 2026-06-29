@@ -11,6 +11,18 @@ class DocumentAnalysis extends Model
     use HasFactory;
 
     /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
+    protected $fillable = [
+        'document_id',
+        'preset',
+        'ai_model',
+        'result_text',
+    ];
+
+    /**
      * Документ, к которому относится этот анализ
      */
     public function document(): BelongsTo

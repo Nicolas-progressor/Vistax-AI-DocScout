@@ -127,44 +127,52 @@ function getStatusIcon(docId: number): string {
         <div
           v-for="doc in documentStore.documentList"
           :key="doc.id"
-          class="group relative"
+          class="group relative flex items-center"
         >
           <!-- Document Button -->
           <button
             @click="() => { handleSelect(doc.id); loadAnalysisStatus(doc.id) }"
-            class="w-full p-3 text-left rounded-lg transition-all hover:bg-gray-50"
+            class="flex-1 p-3 pr-10 text-left rounded-lg transition-all hover:bg-gray-50"
             :class="[
               documentStore.currentDocument?.id === doc.id
                 ? 'bg-blue-50 ring-2 ring-blue-200'
                 : '',
             ]"
           >
-            <div class="flex items-start space-x-3">
-              <span class="text-2xl flex-shrink-0 mt-0.5">
+            <div class="flex items-center space-x-3">
+              <!-- Icon -->
+              <span class="text-2xl flex-shrink-0">
                 {{ getIcon(doc.file_name) }}
               </span>
+              
+              <!-- Content -->
               <div class="flex-1 min-w-0">
-                <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
                   <p class="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600 transition-colors">
                     {{ doc.file_name }}
                   </p>
-                  <span class="text-xs ml-2 flex-shrink-0">
+                  <!-- Status Icon -->
+                  <span
+                    class="text-xs flex-shrink-0"
+                    :class="getStatusIcon(doc.id) === '✅' ? 'text-green-600' : 'text-gray-400'"
+                  >
                     {{ getStatusIcon(doc.id) }}
                   </span>
                 </div>
-                <p class="text-xs text-gray-500 mt-1">
+                <p class="text-xs text-gray-500 mt-0.5">
                   {{ doc.created_at_formatted }}
                 </p>
               </div>
             </div>
           </button>
           
-          <!-- Delete Button -->
+          <!-- Delete Button (отдельно справа) -->
           <button
             @click="(e) => handleDelete(doc.id, doc.file_name, e)"
             :disabled="deletingId === doc.id"
-            class="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 disabled:opacity-50"
+            class="absolute right-1.5 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 disabled:opacity-50"
             title="Удалить документ"
+            style="z-index: 10;"
           >
             <svg
               v-if="deletingId !== doc.id"

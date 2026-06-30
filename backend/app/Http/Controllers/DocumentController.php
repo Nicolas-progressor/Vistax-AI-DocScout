@@ -48,23 +48,34 @@ class DocumentController extends Controller
         $cacheKey = "doc_analysis:{$fileHash}";
         
         if (Cache::has($cacheKey)) {
-            // Дубликат найден — продлеваем TTL
+            // Дубликат найден — проверяем, существует ли документ в БД
             $cachedData = Cache::get($cacheKey);
-            Cache::put($cacheKey, $cachedData, now()->addDays(7));
             
-            // Продление TTL напрямую в Redis (Highload-style, ~0.1мс)
-            Redis::expire(config('cache.prefix') . $cacheKey, 604800); // 7 дней в секундах
+            $existingDocument = Document::find($cachedData['id']);
             
-            // Сохраняем последний использованный preset для этого документа
-            $presetCacheKey = "doc_preset:{$cachedData['id']}";
-            Cache::put($presetCacheKey, $preset, now()->addDays(7));
-            
-            return response()->json([
-                'id' => $cachedData['id'],
-                'file_name' => $cachedData['file_name'],
-                'cached' => true,
-                'last_preset' => $preset,
-            ]);
+            if ($existingDocument) {
+                // Документ существует — продлеваем TTL
+                Cache::put($cacheKey, $cachedData, now()->addDays(7));
+                
+                // Продление TTL напрямую в Redis (Highload-style, ~0.1мс)
+                Redis::expire(config('cache.prefix') . $cacheKey, 604800); // 7 дней в секундах
+                
+                // Сохраняем последний использованный preset для этого документа
+                $presetCacheKey = "doc_preset:{$cachedData['id']}";
+                Cache::put($presetCacheKey, $preset, now()->addDays(7));
+                
+                return response()->json([
+                    'id' => $cachedData['id'],
+                    'file_name' => $cachedData['file_name'],
+                    'cached' => true,
+                    'last_preset' => $preset,
+                ]);
+            } else {
+                // Документ удалён из БД, но кэш остался — удаляем кэш
+                Cache::forget($cacheKey);
+                $presetCacheKey = "doc_preset:{$cachedData['id']}";
+                Cache::forget($presetCacheKey);
+            }
         }
         
         // Новый файл — парсим и сохраняем

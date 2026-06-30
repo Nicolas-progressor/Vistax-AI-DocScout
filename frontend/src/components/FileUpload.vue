@@ -2,10 +2,6 @@
 import { ref } from 'vue'
 import { useDocumentStore } from '@/stores/documentStore'
 
-const props = defineProps<{
-  preset: 'legal_audit' | 'invoice_check' | 'free_chat'
-}>()
-
 const emit = defineEmits<{
   (e: 'uploaded', documentId: number): void
 }>()
@@ -15,15 +11,9 @@ const documentStore = useDocumentStore()
 const isDragging = ref(false)
 const uploadProgress = ref(0)
 
-const presetLabels: Record<string, string> = {
-  legal_audit: 'Юридический аудит',
-  invoice_check: 'Проверка счёта',
-  free_chat: 'Консультация',
-}
-
 async function handleFile(file: File) {
   try {
-    const result = await documentStore.uploadDocument(file, props.preset)
+    const result = await documentStore.uploadDocument(file)
     emit('uploaded', result.id)
   } catch (e) {
     console.error('Upload error:', e)
@@ -96,11 +86,6 @@ function onFileSelect(e: Event) {
         <p class="text-sm text-gray-500 mt-1">
           или нажмите для выбора (PDF, DOCX, DOC, TXT, JSON до 10MB)
         </p>
-      </div>
-
-      <!-- Preset Badge -->
-      <div class="inline-block px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-        {{ presetLabels[preset] }}
       </div>
 
       <!-- Hidden File Input -->

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch, WatchStopHandle } from 'vue'
+import { ref, computed } from 'vue'
 import { useDocumentStore } from '@/stores/documentStore'
 import FileUpload from '@/components/FileUpload.vue'
 import AnalysisPanel from '@/components/AnalysisPanel.vue'
@@ -8,25 +8,9 @@ import DocumentList from '@/components/DocumentList.vue'
 
 const documentStore = useDocumentStore()
 
-// Список загружается в DocumentList.vue при монтировании компонента
-
-const selectedPreset = ref<'legal_audit' | 'invoice_check' | 'free_chat'>('legal_audit')
 const showAnalysis = ref(false)
 const activeTab = ref<'analysis' | 'chat'>('analysis')
 const isSidebarCollapsed = ref(false)
-
-// Синхронизируем selectedPreset с lastUsedPreset из store
-watch(() => documentStore.lastUsedPreset, (newPreset) => {
-  if (newPreset) {
-    selectedPreset.value = newPreset
-  }
-}, { immediate: true })
-
-const presetTabs = [
-  { id: 'legal_audit', label: 'Юридический аудит', description: 'Поиск рисков и кабальных условий', icon: '⚖️', color: 'blue' },
-  { id: 'invoice_check', label: 'Проверка счёта', description: 'Аномалии и ошибки в суммах', icon: '💰', color: 'green' },
-  { id: 'free_chat', label: 'Консультация', description: 'Вопросы по документу', icon: '💬', color: 'purple' },
-] as const
 
 const rightTabs = [
   { id: 'analysis', label: '📊 Результат анализа', icon: '📊' },
@@ -36,11 +20,9 @@ const rightTabs = [
 const hasDocuments = computed(() => documentStore.documentList.length > 0)
 
 async function handleUploaded(documentId: number) {
-  // Обновляем список документов после загрузки
   await documentStore.fetchDocumentList()
-  
   showAnalysis.value = true
-  activeTab.value = selectedPreset.value === 'free_chat' ? 'chat' : 'analysis'
+  activeTab.value = 'analysis'
 }
 
 function resetAnalysis() {
@@ -57,50 +39,6 @@ function handleDocumentSelect() {
 function toggleSidebar() {
   isSidebarCollapsed.value = !isSidebarCollapsed.value
 }
-
-// Индикаторы состояния анализа для каждого пресета
-const analyzingPresets = ref<Set<string>>(new Set())
-
-function getPresetLabel(presetId: string): string {
-  const preset = presetTabs.find(p => p.id === presetId)
-  return preset?.label || presetId
-}
-
-function hasSavedAnalysis(presetId: string): boolean {
-  return documentStore.hasSavedAnalysis(presetId)
-}
-
-function isAnalyzingPreset(presetId: string): boolean {
-  return analyzingPresets.value.has(presetId)
-}
-
-async function changePreset(newPreset: 'legal_audit' | 'invoice_check' | 'free_chat') {
-  // Если уже выбран этот пресет — ничего не делаем
-  if (selectedPreset.value === newPreset) return
-  
-  // Переключаем пресет
-  selectedPreset.value = newPreset
-  
-  // Переключаем вкладку на анализ (не на чат)
-  activeTab.value = 'analysis'
-  
-  // Если для этого пресета уже есть анализ — просто показываем его (AnalysisPanel сам обработает)
-  // Если нет — запускаем анализ (тоже автоматически через AnalysisPanel)
-}
-
-// Watch за изменением currentDocument для сброса состояния анализа
-watch(() => documentStore.currentDocument?.id, () => {
-  analyzingPresets.value.clear()
-})
-
-// Watch за состоянием анализа из store
-watch(() => documentStore.analysisResult.isStreaming, (isStreaming) => {
-  if (isStreaming) {
-    analyzingPresets.value.add(selectedPreset.value)
-  } else {
-    analyzingPresets.value.delete(selectedPreset.value)
-  }
-})
 </script>
 
 <template>
@@ -203,51 +141,16 @@ watch(() => documentStore.analysisResult.isStreaming, (isStreaming) => {
             <!-- Hero Section -->
             <div class="text-center mb-10">
               <h2 class="text-3xl font-bold text-gray-900 mb-3">
-                Выберите тип анализа
+                Универсальный анализ документов
               </h2>
               <p class="text-gray-500 text-lg max-w-xl mx-auto">
-                Загрузите документ и получите детальный ИИ-анализ за считанные секунды
+                Загрузите договор, счёт или любой B2B-документ — ИИ найдёт скрытые риски, финансовые ловушки и юридические капканы
               </p>
             </div>
             
-            <!-- Preset Cards -->
-            <div class="grid md:grid-cols-3 gap-5 mb-8">
-              <button
-                v-for="preset in presetTabs"
-                :key="preset.id"
-                @click="selectedPreset = preset.id"
-                class="group relative p-6 text-left rounded-2xl border-2 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 overflow-hidden"
-                :class="[
-                  selectedPreset === preset.id
-                    ? `border-${preset.color}-500 bg-gradient-to-br from-${preset.color}-50 to-white ring-2 ring-${preset.color}-200 shadow-lg`
-                    : 'border-gray-200 bg-white hover:border-gray-300',
-                ]"
-              >
-                <!-- Background Pattern -->
-                <div class="absolute top-0 right-0 w-24 h-24 opacity-5 group-hover:opacity-10 transition-opacity">
-                  <div :class="`bg-${preset.color}-500 rounded-full blur-2xl`"></div>
-                </div>
-                
-                <div class="relative">
-                  <div class="text-4xl mb-4 transform group-hover:scale-110 transition-transform duration-300">
-                    {{ preset.icon }}
-                  </div>
-                  <div class="font-bold text-lg text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
-                    {{ preset.label }}
-                  </div>
-                  <div class="text-sm text-gray-500 leading-relaxed">
-                    {{ preset.description }}
-                  </div>
-                </div>
-              </button>
-            </div>
-
             <!-- File Upload -->
             <div class="max-w-2xl mx-auto">
-              <FileUpload
-                :preset="selectedPreset"
-                @uploaded="handleUploaded"
-              />
+              <FileUpload @uploaded="handleUploaded" />
             </div>
           </div>
 
@@ -283,66 +186,6 @@ watch(() => documentStore.analysisResult.isStreaming, (isStreaming) => {
                     >
                       {{ documentStore.currentDocument?.cached ? '✓ Из кэша' : '✨ Новый' }}
                     </span>
-                  </div>
-                  <div class="flex justify-between py-3">
-                    <span class="text-gray-500 text-sm">Тип анализа</span>
-                    <span class="text-gray-900 font-medium text-sm text-right">
-                      {{ getPresetLabel(selectedPreset) }}
-                    </span>
-                  </div>
-                </div>
-                
-                <!-- Preset Switcher -->
-                <div class="mt-5 pt-5 border-t border-gray-100">
-                  <p class="text-xs font-semibold text-gray-600 mb-3 uppercase tracking-wide">
-                    Изменить тип анализа
-                  </p>
-                  <div class="space-y-2">
-                    <button
-                      v-for="preset in presetTabs"
-                      :key="preset.id"
-                      @click="changePreset(preset.id)"
-                      class="w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all duration-300 hover:shadow-md"
-                      :class="[
-                        selectedPreset === preset.id
-                          ? `border-${preset.color}-500 bg-gradient-to-r from-${preset.color}-50 to-white ring-1 ring-${preset.color}-200 shadow-sm`
-                          : 'border-gray-200 bg-white hover:border-gray-300',
-                      ]"
-                    >
-                      <div class="flex items-center space-x-3">
-                        <span class="text-xl">{{ preset.icon }}</span>
-                        <div class="text-left">
-                          <p class="text-sm font-semibold text-gray-900">{{ preset.label }}</p>
-                        </div>
-                      </div>
-                      <div class="flex items-center space-x-2">
-                        <!-- Индикатор наличия анализа -->
-                        <span
-                          v-if="hasSavedAnalysis(preset.id)"
-                          class="text-xs font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded-full"
-                        >
-                          ✓ Готов
-                        </span>
-                        <span
-                          v-else-if="isAnalyzingPreset(preset.id)"
-                          class="text-xs font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full flex items-center"
-                        >
-                          <svg class="animate-spin h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                          Анализ...
-                        </span>
-                        <svg
-                          v-if="selectedPreset === preset.id"
-                          class="w-5 h-5 text-blue-600"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                        </svg>
-                      </div>
-                    </button>
                   </div>
                 </div>
               </div>
@@ -390,7 +233,6 @@ watch(() => documentStore.analysisResult.isStreaming, (isStreaming) => {
                     <AnalysisPanel
                       v-show="activeTab === 'analysis'"
                       :document-id="documentStore.currentDocument?.id || 0"
-                      :preset="selectedPreset"
                     />
                   </Transition>
                   <Transition name="fade" mode="out-in">

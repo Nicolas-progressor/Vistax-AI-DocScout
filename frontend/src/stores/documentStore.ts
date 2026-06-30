@@ -50,7 +50,6 @@ export const useDocumentStore = defineStore('document', () => {
   const currentDocument = ref<DocumentWithAnalysis | null>(null)
   const documentList = ref<DocumentListItem[]>([])
   const savedAnalyses = ref<SavedAnalysis[]>([])
-  const lastUsedPreset = ref<'legal_audit' | 'invoice_check' | 'free_chat'>('legal_audit')
   const analysisResult = ref<AnalysisResult>({
     text: '',
     isStreaming: false,
@@ -66,14 +65,13 @@ export const useDocumentStore = defineStore('document', () => {
   const hasDocument = computed(() => currentDocument.value !== null)
 
   // Actions
-  async function uploadDocument(file: File, preset: string): Promise<Document> {
+  async function uploadDocument(file: File): Promise<Document> {
     isLoading.value = true
     error.value = null
 
     try {
       const formData = new FormData()
       formData.append('file', file)
-      formData.append('preset', preset)
 
       const response = await axios.post('/api/documents/upload', formData, {
         headers: {
@@ -83,11 +81,6 @@ export const useDocumentStore = defineStore('document', () => {
 
       const documentId = response.data.id
       
-      // Сохраняем last_preset если пришёл в ответе
-      if (response.data.last_preset) {
-        lastUsedPreset.value = response.data.last_preset
-      }
-
       // Сначала обновляем список документов
       await fetchDocumentList()
       
@@ -103,7 +96,6 @@ export const useDocumentStore = defineStore('document', () => {
             raw_text: '',
             created_at: new Date().toISOString(),
             cached: response.data.cached,
-            last_preset: response.data.last_preset,
           }
         } else {
           throw fetchError
@@ -150,18 +142,6 @@ export const useDocumentStore = defineStore('document', () => {
       // Сохраняем анализы если они есть
       if (response.data.analyses && response.data.analyses.length > 0) {
         savedAnalyses.value = response.data.analyses
-        
-        // Восстанавливаем последний использованный пресет по последнему анализу
-        const lastAnalysis = response.data.analyses
-          .sort((a: SavedAnalysis, b: SavedAnalysis) => 
-            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-          )[0]
-        if (lastAnalysis) {
-          lastUsedPreset.value = lastAnalysis.preset
-        }
-      } else if (response.data.last_preset) {
-        // Если анализов нет, но есть last_preset от сервера (для дубликатов)
-        lastUsedPreset.value = response.data.last_preset
       }
     } catch (e: any) {
       error.value = e.response?.data?.message || 'Ошибка загрузки документа'
@@ -187,7 +167,6 @@ export const useDocumentStore = defineStore('document', () => {
 
   async function analyzeDocument(
     id: number,
-    preset: string,
     onChunk: (text: string) => void
   ): Promise<void> {
     analysisResult.value = {
@@ -198,7 +177,7 @@ export const useDocumentStore = defineStore('document', () => {
     error.value = null
 
     try {
-      const response = await fetch(`/api/documents/${id}/analyze?preset=${preset}`)
+      const response = await fetch(`/api/documents/${id}/analyze`)
 
       if (!response.ok) {
         throw new Error('Ошибка анализа документа')
@@ -489,7 +468,6 @@ export const useDocumentStore = defineStore('document', () => {
     currentDocument,
     documentList,
     savedAnalyses,
-    lastUsedPreset,
     analysisResult,
     chatMessages,
     isChatStreaming,

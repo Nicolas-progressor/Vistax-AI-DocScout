@@ -4,7 +4,6 @@ import { useDocumentStore } from '@/stores/documentStore'
 
 const props = defineProps<{
   documentId: number
-  preset: 'legal_audit' | 'invoice_check' | 'free_chat'
 }>()
 
 const documentStore = useDocumentStore()
@@ -14,13 +13,13 @@ const isAnalyzing = ref(false)
 const hasError = ref(false)
 const forceShowEmpty = ref(false)
 
-// Проверяем наличие сохранённого анализа
+// Проверяем наличие сохранённого анализа (универсальный)
 const savedAnalysis = computed(() => {
-  return documentStore.getSavedAnalysis(props.preset)
+  return documentStore.getSavedAnalysis('universal')
 })
 
 const hasSavedAnalysis = computed(() => {
-  return documentStore.hasSavedAnalysis(props.preset)
+  return documentStore.hasSavedAnalysis('universal')
 })
 
 // Форматирование markdown (базовое)
@@ -67,7 +66,6 @@ async function startAnalysis() {
   try {
     await documentStore.analyzeDocument(
       props.documentId,
-      props.preset,
       (chunk: string) => {
         streamedText.value += chunk
       }
@@ -80,15 +78,14 @@ async function startAnalysis() {
   }
 }
 
-// Запускаем анализ при монтировании или изменении preset/documentId
+// Запускаем анализ при монтировании или изменении documentId
 onMounted(() => {
   nextTick(() => {
     startAnalysis()
   })
 })
 
-watch([() => props.preset, () => props.documentId], async () => {
-  // Небольшая задержка для корректного обновления UI
+watch(() => props.documentId, async () => {
   await nextTick()
   startAnalysis()
 })

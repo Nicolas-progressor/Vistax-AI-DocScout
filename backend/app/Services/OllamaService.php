@@ -19,70 +19,48 @@ class OllamaService
     }
     
     /**
-     * Системные промпты для разных пресетов
+     * Универсальный системный промпт для анализа документов
      */
-    private function getSystemPrompt(string $preset): string
+    private function getSystemPrompt(): string
     {
-        return match ($preset) {
-            'legal_audit' => <<<PROMPT
+        return <<<PROMPT
 IMPORTANT: Answer ONLY in Russian language. English is FORBIDDEN.
 
-Ты — опытный b2b-юрист. Проанализируй договор и найди риски для Исполнителя.
+Ты — циничный, опытный и крайне въедливый b2b-юрист и финансовый ревизор. Твоя единственная задача — защитить интересы Исполнителя (подрядчика, поставщика, физлица или ИП) и найти любые скрытые ловушки, кабальные условия, финансовые потери и юридический беспредел в предоставленном документе.
 
 ОТВЕЧАЙ СТРОГО НА РУССКОМ ЯЗЫКЕ!
 
-Пункты для анализа:
-1. ФИНАНСОВЫЕ РИСКИ: сроки оплаты, постоплата, штрафы
-2. ОТВЕТСТВЕННОСТЬ: сравни пени Исполнителя и Заказчика
-3. ПРАВА НА РЕЗУЛЬТАТЫ: кому переходят права
-4. РАСТОРЖЕНИЕ: условия разрыва контракта
+Проанализируй текст и выведи отчет СТРОГО по следующим универсальным блокам:
 
-Правила:
-- Пиши ТОЛЬКО по-русски
-- Если риск — начни строку с "⚠️ РИСК:"
-- Цитируй цифры и пункты договора
-- Без общих фраз
-PROMPT,
-            'invoice_check' => <<<PROMPT
-IMPORTANT: Answer ONLY in Russian language. English is FORBIDDEN.
+1. 💰 ФИНАНСОВЫЕ КАПКАНЫ И НАЦЕНКИ:
+   - Проведи аудит условий оплаты, валюты (У.Е.), скрытых конвертаций, отсрочек платежей после подписания Актов, или необоснованных позиций/налогов/сборов в спецификации.
 
-Ты — финансовый аудитор. Проверь счет на ошибки и мошенничество.
+2. ⚡ АСИММЕТРИЯ ОТВЕТСТВЕННОСТИ И ШТРАФЫ:
+   - Сравни пени и штрафы сторон (за просрочку выполнения против просрочки оплаты). Проверь наличие пунктов о полном возмещении упущенной выгоды Исполнителем или жестких фиксированных штрафов за каждый чих.
 
-ОТВЕЧАЙ СТРОГО НА РУССКОМ ЯЗЫКЕ!
+3. 🔒 ПРАВА, ЛОГИСТИКА И ОГРАНИЧЕНИЯ:
+   - В какой момент переходят права на результаты работ/товары (до финальной оплаты или в момент создания)? Есть ли логистические капканы (удаленный склад, кабальная стоимость хранения)?
 
-Пункты для анализа:
-1. ВАЛЮТА И НАЦЕНКИ: проверь У.Е., скрытые комиссии
-2. ФЕИКОВЫЕ ПОЗИЦИИ: выдуманные услуги, налоги
-3. ЛОГИСТИКА: условия поставки, штрафы
-4. ЮРИДИЧЕСКИЕ ЛОВУШКИ: отказ от Актов, удаленные суды
+4. ❌ УСЛОВИЯ РАСТОРЖЕНИЯ И СУД:
+   - Оцени сроки одностороннего разрыва контракта Заказчиком (за сколько дней уведомление). Где и в каком суде будут решаться споры (скрытые третейские суды по месту нахождения Заказчика)?
 
-Правила:
-- Пиши ТОЛЬКО по-русски
-- Если аномалия — начни строку с "🚨 АНОМАЛИЯ:"
-- Цитируй суммы и пункты
-- Без общих фраз
-PROMPT,
-            'free_chat' => <<<PROMPT
-IMPORTANT: Answer ONLY in Russian language. English is FORBIDDEN.
-
-Ты — ассистент по документам. Отвечай на вопросы по тексту.
-
-ОТВЕЧАЙ СТРОГО НА РУССКОМ ЯЗЫКЕ!
-PROMPT,
-            default => throw new \InvalidArgumentException("Неизвестный пресет: {$preset}"),
-        };
+ПРАВИЛА И ФОРМАТИРОВАНИЕ:
+- Пиши ТОЛЬКО по-русски, без общих фраз и юридической "воды".
+- Если пункт несет финансовые или юридические риски для Исполнителя — ОБЯЗАТЕЛЬНО начни эту строку строго с маркера "⚠️ КРИТИЧЕСКИЙ РИСК:".
+- Всегда цитируй конкретные цифры, сроки, суммы, проценты и номера пунктов из текста документа.
+- Если какого-то блока нет в документе (например, в счете нет пунктов о расторжении) — просто коротко напиши: "По тексту документа отсутствуют".
+PROMPT;
     }
     
     /**
-     * Запрос к Ollama с SSE-стримингом и сохранением результата
+     * Стриминг анализа с сохранением результата в БД
      */
     public function streamAnalysisWithSave(
         string $rawText,
-        string $preset,
-        string $model,
-        int $documentId
+        string $model = 'gemma3:4b',
+        ?int $documentId = null
     ): StreamedResponse {
-        $systemPrompt = $this->getSystemPrompt($preset);
+        $systemPrompt = $this->getSystemPrompt();
         
         return new StreamedResponse(function () use ($systemPrompt, $rawText, $model, $preset, $documentId) {
             if (ob_get_level()) {
@@ -162,7 +140,7 @@ PROMPT,
                 \App\Models\DocumentAnalysis::updateOrCreate(
                     [
                         'document_id' => $documentId,
-                        'preset' => $preset,
+                        'preset' => 'universal',
                         'ai_model' => $model,
                     ],
                     ['result_text' => $fullResult]
@@ -179,14 +157,13 @@ PROMPT,
     }
     
     /**
-     * Запрос к Ollama с SSE-стримингом
+     * Стриминг анализа (без сохранения)
      */
     public function streamAnalysis(
         string $rawText,
-        string $preset,
-        string $model = 'gemma2:2b'
+        string $model = 'gemma3:4b'
     ): StreamedResponse {
-        $systemPrompt = $this->getSystemPrompt($preset);
+        $systemPrompt = $this->getSystemPrompt();
         
         return new StreamedResponse(function () use ($systemPrompt, $rawText, $model) {
             // Отключаем всю буферизацию PHP для SSE
@@ -279,10 +256,9 @@ PROMPT,
      */
     public function analyzeSync(
         string $rawText,
-        string $preset,
-        string $model = 'gemma2:2b'
+        string $model = 'gemma3:4b'
     ): string {
-        $systemPrompt = $this->getSystemPrompt($preset);
+        $systemPrompt = $this->getSystemPrompt();
         
         $response = Http::post("{$this->baseUrl}/api/generate", [
             'model' => $model,

@@ -27,18 +27,15 @@ class DocumentController extends Controller
     {
         $request->validate([
             'file' => 'required|file|max:10240|mimes:pdf,txt,json,docx,doc',
-            'preset' => 'required|in:legal_audit,invoice_check,free_chat',
         ], [
             'file.mimes' => 'Неподдерживаемый формат файла. Разрешены: PDF, TXT, JSON, DOCX, DOC',
         ]);
         
         $file = $request->file('file');
-        $preset = $request->input('preset');
         
         \Log::info('Document upload', [
             'file_name' => $file->getClientOriginalName(),
             'file_size' => $file->getSize(),
-            'preset' => $preset,
         ]);
         
         // Расчёт хэша
@@ -57,24 +54,17 @@ class DocumentController extends Controller
                 // Документ существует — продлеваем TTL
                 Cache::put($cacheKey, $cachedData, now()->addDays(7));
                 
-                // Продление TTL напрямую в Redis (Highload-style, ~0.1мс)
-                Redis::expire(config('cache.prefix') . $cacheKey, 604800); // 7 дней в секундах
-                
-                // Сохраняем последний использованный preset для этого документа
-                $presetCacheKey = "doc_preset:{$cachedData['id']}";
-                Cache::put($presetCacheKey, $preset, now()->addDays(7));
+                // Продление TTL напрямую в Redis
+                Redis::expire(config('cache.prefix') . $cacheKey, 604800);
                 
                 return response()->json([
                     'id' => $cachedData['id'],
                     'file_name' => $cachedData['file_name'],
                     'cached' => true,
-                    'last_preset' => $preset,
                 ]);
             } else {
-                // Документ удалён из БД, но кэш остался — удаляем кэш
+                // Документ удалён — очищаем кэш
                 Cache::forget($cacheKey);
-                $presetCacheKey = "doc_preset:{$cachedData['id']}";
-                Cache::forget($presetCacheKey);
             }
         }
         
@@ -94,15 +84,10 @@ class DocumentController extends Controller
             'file_name' => $document->file_name,
         ], now()->addDays(7));
         
-        // Сохраняем последний использованный preset
-        $presetCacheKey = "doc_preset:{$document->id}";
-        Cache::put($presetCacheKey, $preset, now()->addDays(7));
-        
         return response()->json([
             'id' => $document->id,
             'file_name' => $document->file_name,
             'cached' => false,
-            'last_preset' => $preset,
         ]);
     }
         
@@ -111,14 +96,13 @@ class DocumentController extends Controller
      */
     public function analyze(Request $request, int $document): StreamedResponse
     {
-        $preset = $request->query('preset', 'legal_audit');
-        $model = $request->query('model', 'gemma2:2b');
+        $model = $request->query('model', 'gemma3:4b');
         
         $documentModel = Document::findOrFail($document);
         
         // Проверка на закэшированный результат в БД
         $analysis = DocumentAnalysis::where('document_id', $document)
-            ->where('preset', $preset)
+            ->where('preset', 'universal')
             ->where('ai_model', $model)
             ->first();
         
@@ -146,7 +130,6 @@ class DocumentController extends Controller
         // Запускаем стриминг от Ollama с сохранением результата
         return $this->ollamaService->streamAnalysisWithSave(
             $documentModel->raw_text,
-            $preset,
             $model,
             $document
         );
@@ -163,16 +146,11 @@ class DocumentController extends Controller
         $analyses = DocumentAnalysis::where('document_id', $document)
             ->get(['id', 'preset', 'ai_model', 'result_text', 'created_at', 'updated_at']);
         
-        // Получаем последний использованный preset
-        $presetCacheKey = "doc_preset:{$document}";
-        $lastPreset = Cache::get($presetCacheKey, 'legal_audit');
-        
         return response()->json([
             'id' => $documentModel->id,
             'file_name' => $documentModel->file_name,
             'raw_text' => $documentModel->raw_text,
             'created_at' => $documentModel->created_at->toIso8601String(),
-            'last_preset' => $lastPreset,
             'analyses' => $analyses->map(fn($analysis) => [
                 'id' => $analysis->id,
                 'preset' => $analysis->preset,

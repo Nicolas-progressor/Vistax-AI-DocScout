@@ -97,7 +97,10 @@ services:
     ports:
       - "5173:5173"
     environment:
-      VITE_API_URL: http://localhost:8000/api
+      VITE_API_URL: http://host.docker.internal:8000/api
+      # Docker Desktop для Windows/Mac автоматически добавляет host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - nginx
     networks:

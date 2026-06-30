@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Document;
 use App\Models\DocumentAnalysis;
+use App\Models\DocumentChat;
 use App\Services\FileParserService;
 use App\Services\OllamaService;
 use Illuminate\Http\JsonResponse;
@@ -224,6 +225,16 @@ class DocumentController extends Controller
         $history = $request->input('history', []);
         $documentModel = Document::findOrFail($document);
         
+        // Сохраняем вопрос пользователя в БД
+        $lastOrder = DocumentChat::where('document_id', $document)->max('message_order') ?? 0;
+        
+        DocumentChat::create([
+            'document_id' => $document,
+            'role' => 'user',
+            'content' => $question,
+            'message_order' => $lastOrder + 1,
+        ]);
+        
         // Формируем системную инструкцию
         $systemPrompt = <<<PROMPT
 Ты — ассистент по анализу документов. Отвечай на вопросы пользователя по контексту загруженного документа.
@@ -244,7 +255,103 @@ PROMPT;
         // Формируем полный промпт
         $prompt = trim("{$systemPrompt}\n\nДОКУМЕНТ:\n{$documentModel->raw_text}{$historyText}\n\nВОПРОС ПОЛЬЗОВАТЕЛЯ:\n{$question}");
         
-        return $this->ollamaService->streamChat($prompt);
+        // Перехватываем ответ и сохраняем его
+        return new StreamedResponse(function () use ($prompt, $document, $lastOrder) {
+            if (ob_get_level()) {
+                ob_end_clean();
+            }
+            ob_implicit_flush(true);
+            
+            $client = Http::withOptions([
+                'stream' => true,
+                'timeout' => 120,
+            ]);
+            
+            $response = $client->post("{$this->baseUrl}/api/generate", [
+                'model' => 'gemma2:2b',
+                'prompt' => $prompt,
+                'system' => "Ты — ассистент по анализу документов. Отвечай на вопросы пользователя по контексту загруженного документа. Будь точен, цитируй конкретные пункты и цифры из текста. Если не знаешь ответа — скажи честно. Пиши строго на русском языке.",
+                'stream' => true,
+                'temperature' => 0.3,
+                'top_p' => 0.2,
+                'num_ctx' => 16384,
+                'num_predict' => 2048,
+            ]);
+            
+            $body = $response->getBody();
+            $fullResult = '';
+            
+            header('Content-Type: text/event-stream; charset=UTF-8');
+            header('X-Accel-Buffering: no');
+            
+            $lineBuffer = '';
+            
+            while (!$body->eof()) {
+                $char = $body->read(1);
+                
+                if ($char === '' || $char === false) {
+                    break;
+                }
+                
+                if ($char === "\n") {
+                    $line = trim($lineBuffer);
+                    $lineBuffer = '';
+                    
+                    if (empty($line)) {
+                        continue;
+                    }
+                    
+                    $data = json_decode($line, true);
+                    if (isset($data['response'])) {
+                        $fullResult .= $data['response'];
+                        $sseData = json_encode(['text' => $data['response']], JSON_UNESCAPED_UNICODE);
+                        echo "data: {$sseData}\n\n";
+                        @ob_flush();
+                        flush();
+                    }
+                } else {
+                    $lineBuffer .= $char;
+                }
+            }
+            
+            // Сохраняем ответ ассистента в БД
+            if (!empty($fullResult)) {
+                DocumentChat::create([
+                    'document_id' => $document,
+                    'role' => 'assistant',
+                    'content' => $fullResult,
+                    'message_order' => $lastOrder + 2,
+                ]);
+            }
+        }, 200, [
+            'Content-Type' => 'text/event-stream; charset=UTF-8',
+            'Cache-Control' => 'no-cache',
+            'X-Accel-Buffering' => 'no',
+            'Access-Control-Allow-Origin' => 'http://localhost:5173',
+            'Connection' => 'keep-alive',
+            'Transfer-Encoding' => 'chunked',
+        ]);
+    }
+    
+    /**
+     * Получение истории чата для документа
+     */
+    public function chatHistory(int $document): JsonResponse
+    {
+        $documentModel = Document::findOrFail($document);
+        
+        $chats = DocumentChat::where('document_id', $document)
+            ->orderBy('message_order', 'asc')
+            ->get(['id', 'role', 'content', 'created_at']);
+        
+        return response()->json([
+            'chats' => $chats->map(fn($chat) => [
+                'id' => $chat->id,
+                'role' => $chat->role,
+                'content' => $chat->content,
+                'created_at' => $chat->created_at->toIso8601String(),
+            ]),
+        ]);
     }
 }
     

@@ -163,6 +163,9 @@ export const useDocumentStore = defineStore('document', () => {
     
     // Загружаем выбранный документ с анализами
     await fetchDocument(id)
+    
+    // Загружаем историю чата
+    await loadChatHistory(id)
   }
 
   async function analyzeDocument(
@@ -442,6 +445,28 @@ export const useDocumentStore = defineStore('document', () => {
     error.value = null
   }
 
+  /**
+   * Загрузка истории чата для документа
+   */
+  async function loadChatHistory(id: number): Promise<void> {
+    try {
+      const response = await axios.get(`/api/documents/${id}/chat/history`)
+      
+      if (response.data.chats && response.data.chats.length > 0) {
+        chatMessages.value = response.data.chats.map((chat: any, index: number) => ({
+          id: chat.id,
+          role: chat.role as 'user' | 'assistant',
+          content: chat.content,
+          timestamp: new Date(chat.created_at),
+          isStreaming: false,
+        }))
+      }
+    } catch (e: any) {
+      console.error('Ошибка загрузки истории чата:', e)
+      error.value = 'Не удалось загрузить историю чата'
+    }
+  }
+
   function getSavedAnalysis(preset: string): string | null {
     const analysis = savedAnalyses.value.find(a => a.preset === preset)
     return analysis?.result_text || null
@@ -492,6 +517,7 @@ export const useDocumentStore = defineStore('document', () => {
     selectDocument,
     analyzeDocument,
     sendChatMessage,
+    loadChatHistory,
     reset,
     resetChat,
     getSavedAnalysis,

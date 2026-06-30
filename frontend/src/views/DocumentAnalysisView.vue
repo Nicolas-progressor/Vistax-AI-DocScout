@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useDocumentStore } from '@/stores/documentStore'
 import FileUpload from '@/components/FileUpload.vue'
 import AnalysisPanel from '@/components/AnalysisPanel.vue'
@@ -11,6 +11,7 @@ const documentStore = useDocumentStore()
 const showAnalysis = ref(false)
 const activeTab = ref<'analysis' | 'chat'>('analysis')
 const isSidebarCollapsed = ref(false)
+const selectedDocId = ref<number | null>(null)
 
 const rightTabs = [
   { id: 'analysis', label: '📊 Результат анализа', icon: '📊' },
@@ -23,6 +24,8 @@ async function handleUploaded(documentId: number) {
   await documentStore.fetchDocumentList()
   showAnalysis.value = true
   activeTab.value = 'analysis'
+  selectedDocId.value = documentId
+  await documentStore.loadChatHistory(documentId)
 }
 
 function resetAnalysis() {
@@ -30,15 +33,27 @@ function resetAnalysis() {
   documentStore.resetChat()
   showAnalysis.value = false
   activeTab.value = 'analysis'
+  selectedDocId.value = null
 }
 
-function handleDocumentSelect() {
+async function handleDocumentSelect() {
   showAnalysis.value = true
+  if (documentStore.currentDocument?.id) {
+    selectedDocId.value = documentStore.currentDocument.id
+    await documentStore.loadChatHistory(documentStore.currentDocument.id)
+  }
 }
 
 function toggleSidebar() {
   isSidebarCollapsed.value = !isSidebarCollapsed.value
 }
+
+// Следим за сменой документа
+watch(() => documentStore.currentDocument?.id, async (newId) => {
+  if (newId) {
+    await documentStore.loadChatHistory(newId)
+  }
+})
 </script>
 
 <template>
@@ -238,6 +253,7 @@ function toggleSidebar() {
                   <Transition name="fade" mode="out-in">
                     <ChatPanel
                       v-show="activeTab === 'chat'"
+                      :key="documentStore.currentDocument?.id || 0"
                       :document-id="documentStore.currentDocument?.id || 0"
                       :is-visible="showAnalysis"
                     />

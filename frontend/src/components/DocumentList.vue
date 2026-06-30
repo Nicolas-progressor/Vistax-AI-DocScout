@@ -19,7 +19,7 @@ onMounted(async () => {
 })
 
 async function handleSelect(id: number) {
-  await documentStore.selectDocument(id)
+  documentStore.selectDocument(id)
   emit('select', id)
 }
 
@@ -131,7 +131,7 @@ function getStatusIcon(docId: number): string {
         >
           <!-- Document Button -->
           <button
-            @click="async () => { await handleSelect(doc.id); loadAnalysisStatus(doc.id) }"
+            @click="handleSelect(doc.id)"
             class="flex-1 p-3 pr-10 text-left rounded-lg transition-all hover:bg-gray-50"
             :class="[
               documentStore.currentDocument?.id === doc.id

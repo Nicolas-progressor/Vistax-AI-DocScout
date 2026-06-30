@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, watch } from 'vue'
+import { ref, computed, nextTick, watch, onMounted } from 'vue'
 import { useDocumentStore } from '@/stores/documentStore'
 
 const props = defineProps<{
@@ -11,7 +11,32 @@ const documentStore = useDocumentStore()
 
 const questionInput = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
-const localMessages = computed(() => documentStore.chatMessages)
+const localMessages = computed(() => documentStore.chatMessages
+
+// Загружаем историю при монтировании
+onMounted(async () => {
+  if (props.documentId && documentStore.chatMessages.length === 0) {
+    await documentStore.loadChatHistory(props.documentId)
+  }
+})
+
+// Авто-скролл к последнему сообщению
+async function scrollToBottom() {
+  await nextTick()
+  if (messagesContainer.value) {
+    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+  }
+}
+
+watch(() => localMessages.value.length, scrollToBottom)
+watch(() => documentStore.isChatStreaming, scrollToBottom)
+
+// Следим за сменой документа
+watch(() => props.documentId, async (newId) => {
+  if (newId) {
+    await documentStore.loadChatHistory(newId)
+  }
+}))
 
 // Авто-скролл к последнему сообщению
 async function scrollToBottom() {

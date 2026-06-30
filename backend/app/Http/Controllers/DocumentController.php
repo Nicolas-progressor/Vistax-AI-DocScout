@@ -28,10 +28,18 @@ class DocumentController extends Controller
         $request->validate([
             'file' => 'required|file|max:10240|mimes:pdf,txt,json,docx,doc',
             'preset' => 'required|in:legal_audit,invoice_check,free_chat',
+        ], [
+            'file.mimes' => 'Неподдерживаемый формат файла. Разрешены: PDF, TXT, JSON, DOCX, DOC',
         ]);
         
         $file = $request->file('file');
         $preset = $request->input('preset');
+        
+        \Log::info('Document upload', [
+            'file_name' => $file->getClientOriginalName(),
+            'file_size' => $file->getSize(),
+            'preset' => $preset,
+        ]);
         
         // Расчёт хэша
         $fileHash = hash_file('sha256', $file->getRealPath());
@@ -86,7 +94,7 @@ class DocumentController extends Controller
             'last_preset' => $preset,
         ]);
     }
-    
+        
     /**
      * Анализ документа с SSE-стримингом
      */

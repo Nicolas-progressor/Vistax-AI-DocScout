@@ -46,6 +46,14 @@ async function startAnalysis() {
   streamedText.value = ''
   forceShowEmpty.value = false
   
+  // Проверка на валидный documentId
+  if (!props.documentId || props.documentId <= 0) {
+    console.warn('AnalysisPanel: Invalid documentId', props.documentId)
+    isAnalyzing.value = false
+    hasError.value = false
+    return
+  }
+
   // Если есть сохранённый анализ, используем его
   if (hasSavedAnalysis.value) {
     isAnalyzing.value = false

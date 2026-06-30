@@ -62,7 +62,7 @@ PROMPT;
     ): StreamedResponse {
         $systemPrompt = $this->getSystemPrompt();
         
-        return new StreamedResponse(function () use ($systemPrompt, $rawText, $model, $preset, $documentId) {
+        return new StreamedResponse(function () use ($systemPrompt, $rawText, $model, $documentId) {
             if (ob_get_level()) {
                 ob_end_clean();
             }

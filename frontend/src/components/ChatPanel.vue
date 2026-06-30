@@ -11,7 +11,7 @@ const documentStore = useDocumentStore()
 
 const questionInput = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
-const localMessages = computed(() => documentStore.chatMessages
+const localMessages = computed(() => documentStore.chatMessages)
 
 // Загружаем историю при монтировании
 onMounted(async () => {
@@ -36,18 +36,7 @@ watch(() => props.documentId, async (newId) => {
   if (newId) {
     await documentStore.loadChatHistory(newId)
   }
-}))
-
-// Авто-скролл к последнему сообщению
-async function scrollToBottom() {
-  await nextTick()
-  if (messagesContainer.value) {
-    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
-  }
-}
-
-watch(() => localMessages.value.length, scrollToBottom)
-watch(() => documentStore.isChatStreaming, scrollToBottom)
+})
 
 async function sendMessage() {
   const question = questionInput.value.trim()

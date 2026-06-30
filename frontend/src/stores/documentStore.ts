@@ -81,13 +81,34 @@ export const useDocumentStore = defineStore('document', () => {
         },
       })
 
+      const documentId = response.data.id
+      
       // Сохраняем last_preset если пришёл в ответе
       if (response.data.last_preset) {
         lastUsedPreset.value = response.data.last_preset
       }
 
-      // Получаем полную информацию о документе с raw_text
-      await fetchDocument(response.data.id)
+      // Сначала обновляем список документов
+      await fetchDocumentList()
+      
+      // Затем загружаем документ (теперь он точно есть в БД)
+      try {
+        await fetchDocument(documentId)
+      } catch (fetchError: any) {
+        // Если документ не найден (404) — используем данные из upload
+        if (fetchError.response?.status === 404) {
+          currentDocument.value = {
+            id: documentId,
+            file_name: response.data.file_name,
+            raw_text: '',
+            created_at: new Date().toISOString(),
+            cached: response.data.cached,
+            last_preset: response.data.last_preset,
+          }
+        } else {
+          throw fetchError
+        }
+      }
       
       // Добавляем флаг cached из ответа upload
       if (currentDocument.value) {

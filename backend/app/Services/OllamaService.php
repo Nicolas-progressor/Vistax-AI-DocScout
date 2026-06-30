@@ -75,9 +75,8 @@ PROMPT,
         int $documentId
     ): StreamedResponse {
         $systemPrompt = $this->getSystemPrompt($preset);
-        $prompt = trim("{$systemPrompt}\n\nДОКУМЕНТ ДЛЯ АНАЛИЗА:\n{$rawText}");
         
-        return new StreamedResponse(function () use ($prompt, $model, $preset, $documentId) {
+        return new StreamedResponse(function () use ($systemPrompt, $rawText, $model, $preset, $documentId) {
             if (ob_get_level()) {
                 ob_end_clean();
             }
@@ -88,9 +87,12 @@ PROMPT,
                 'timeout' => 300,
             ]);
             
+            // Разделяем системную инструкцию и пользовательский промпт
+            // Ollama лучше понимает system параметр для инструкций
             $response = $client->post("{$this->baseUrl}/api/generate", [
                 'model' => $model,
-                'prompt' => $prompt,
+                'prompt' => "ДОКУМЕНТ ДЛЯ АНАЛИЗА:\n{$rawText}",
+                'system' => $systemPrompt,
                 'stream' => true,
                 'temperature' => 0.2,
                 'top_p' => 0.1,
@@ -178,10 +180,7 @@ PROMPT,
     ): StreamedResponse {
         $systemPrompt = $this->getSystemPrompt($preset);
         
-        // Формируем полный промпт
-        $prompt = trim("{$systemPrompt}\n\nДОКУМЕНТ ДЛЯ АНАЛИЗА:\n{$rawText}");
-        
-        return new StreamedResponse(function () use ($prompt, $model) {
+        return new StreamedResponse(function () use ($systemPrompt, $rawText, $model) {
             // Отключаем всю буферизацию PHP для SSE
             if (ob_get_level()) {
                 ob_end_clean();
@@ -195,7 +194,8 @@ PROMPT,
             
             $response = $client->post("{$this->baseUrl}/api/generate", [
                 'model' => $model,
-                'prompt' => $prompt,
+                'prompt' => "ДОКУМЕНТ ДЛЯ АНАЛИЗА:\n{$rawText}",
+                'system' => $systemPrompt,
                 'stream' => true,
                 // Highload-параметры для стабильной генерации без деградации
                 'temperature' => 0.2,          // Минимум креативности
@@ -275,11 +275,11 @@ PROMPT,
         string $model = 'gemma2:2b'
     ): string {
         $systemPrompt = $this->getSystemPrompt($preset);
-        $prompt = trim("{$systemPrompt}\n\nДОКУМЕНТ ДЛЯ АНАЛИЗА:\n{$rawText}");
         
         $response = Http::post("{$this->baseUrl}/api/generate", [
             'model' => $model,
-            'prompt' => $prompt,
+            'prompt' => "ДОКУМЕНТ ДЛЯ АНАЛИЗА:\n{$rawText}",
+            'system' => $systemPrompt,
             'stream' => false,
             // Highload-параметры для стабильной генерации без деградации
             'temperature' => 0.2,          // Минимум креативности
@@ -309,9 +309,13 @@ PROMPT,
                 'timeout' => 120, // 2 минуты на ответ
             ]);
             
+            // Для чата используем system инструкцию
+            $systemPrompt = "Ты — ассистент по анализу документов. Отвечай на вопросы пользователя по контексту загруженного документа. Пиши строго на русском языке.";
+            
             $response = $client->post("{$this->baseUrl}/api/generate", [
                 'model' => 'gemma2:2b',
                 'prompt' => $prompt,
+                'system' => $systemPrompt,
                 'stream' => true,
                 // Параметры для чата
                 'temperature' => 0.3,          // Чуть больше креативности для диалога

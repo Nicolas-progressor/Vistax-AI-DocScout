@@ -158,7 +158,6 @@ export const useDocumentStore = defineStore('document', () => {
       isStreaming: false,
       isComplete: false,
     }
-    chatMessages.value = []
     savedAnalyses.value = []
     
     // Загружаем выбранный документ с анализами
@@ -484,12 +483,10 @@ export const useDocumentStore = defineStore('document', () => {
    */
   async function loadChatHistory(id: number): Promise<void> {
     try {
-      console.log('📥 Загрузка истории чата для документа:', id)
       const response = await axios.get(`/api/documents/${id}/chat/history`)
       
-      console.log('📥 Получен ответ от API:', JSON.stringify(response.data))
-      
       if (response.data && response.data.chats && Array.isArray(response.data.chats) && response.data.chats.length > 0) {
+        // Создаём новый массив для принудительного обновления реактивности
         chatMessages.value = response.data.chats.map((chat: any) => ({
           id: chat.id,
           role: chat.role as 'user' | 'assistant',
@@ -497,18 +494,11 @@ export const useDocumentStore = defineStore('document', () => {
           timestamp: chat.created_at ? new Date(chat.created_at) : new Date(),
           isStreaming: false,
         }))
-        console.log('✅ История загружена, сообщений:', chatMessages.value.length)
-        console.log('📋 Сообщения:', chatMessages.value.map(m => ({ id: m.id, role: m.role, content: m.content.substring(0, 50) })))
       } else {
-        console.log('⚠️ История пуста или неверный формат')
         chatMessages.value = []
       }
     } catch (e: any) {
-      console.error('❌ Ошибка загрузки истории чата:', e)
-      if (e.response) {
-        console.error('📡 Статус ответа:', e.response.status)
-        console.error('📡 Данные ответа:', e.response.data)
-      }
+      console.error('Ошибка загрузки истории чата:', e)
       error.value = 'Не удалось загрузить историю чата'
     }
   }

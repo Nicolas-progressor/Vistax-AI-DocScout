@@ -215,19 +215,34 @@ class DocumentController extends Controller
     {
         $request->validate([
             'question' => 'required|string|max:2000',
+            'history' => 'nullable|array',
+            'history.*.role' => 'required|in:user,assistant',
+            'history.*.content' => 'required|string',
         ]);
         
         $question = $request->input('question');
+        $history = $request->input('history', []);
         $documentModel = Document::findOrFail($document);
         
-        // Формируем промпт с контекстом документа
+        // Формируем системную инструкцию
         $systemPrompt = <<<PROMPT
 Ты — ассистент по анализу документов. Отвечай на вопросы пользователя по контексту загруженного документа.
 Будь точен, цитируй конкретные пункты и цифры из текста. Если не знаешь ответа — скажи честно.
 Пиши строго на русском языке.
 PROMPT;
         
-        $prompt = trim("{$systemPrompt}\n\nДОКУМЕНТ:\n{$documentModel->raw_text}\n\nВОПРОС ПОЛЬЗОВАТЕЛЯ:\n{$question}");
+        // Формируем историю диалога
+        $historyText = '';
+        if (!empty($history)) {
+            $historyText = "\n\nИСТОРИЯ ДИАЛОГА:\n";
+            foreach ($history as $msg) {
+                $role = $msg['role'] === 'user' ? 'Пользователь' : 'Ассистент';
+                $historyText .= "{$role}: {$msg['content']}\n";
+            }
+        }
+        
+        // Формируем полный промпт
+        $prompt = trim("{$systemPrompt}\n\nДОКУМЕНТ:\n{$documentModel->raw_text}{$historyText}\n\nВОПРОС ПОЛЬЗОВАТЕЛЯ:\n{$question}");
         
         return $this->ollamaService->streamChat($prompt);
     }

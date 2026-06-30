@@ -340,12 +340,21 @@ export const useDocumentStore = defineStore('document', () => {
     error.value = null
 
     try {
+      // Формируем историю диалога (последние 10 сообщений для контекста)
+      const history = chatMessages.value
+        .filter(m => !m.isStreaming && m.content)
+        .slice(-10)
+        .map(m => ({
+          role: m.role,
+          content: m.content,
+        }))
+
       const response = await fetch(`/api/documents/${id}/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ question, history }),
       })
 
       if (!response.ok) {

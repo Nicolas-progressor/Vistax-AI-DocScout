@@ -64,3 +64,6 @@ backend/bootstrap/cache/*
 
 # --- Docker (local overrides) ---
 docker-compose.override.yml
+
+# --- Project Documentation ---
+KODA.md

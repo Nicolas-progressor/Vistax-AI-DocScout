@@ -26,7 +26,7 @@ class DocumentController extends Controller
     public function upload(Request $request): JsonResponse
     {
         $request->validate([
-            'file' => 'required|file|max:10240|mimes:pdf,txt,json',
+            'file' => 'required|file|max:10240|mimes:pdf,txt,json,docx,doc',
             'preset' => 'required|in:legal_audit,invoice_check,free_chat',
         ]);
         

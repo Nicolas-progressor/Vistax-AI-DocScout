@@ -688,7 +688,7 @@
     'fallback_locale' => 'en',
     'faker_locale' => 'en_US',
     'cipher' => 'AES-256-CBC',
-    'key' => 'base64:KdH8KRIO41ACNLyRLxDwNNut2/3JoxS3hdn71ceoBmU=',
+    'key' => 'base64:co+srmgqVz2keStudTaw/6y3kK80tIWQlM1CoKQ8M/4=',
     'previous_keys' => 
     array (
     ),

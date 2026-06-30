@@ -19,7 +19,7 @@ return [
     |--------------------------------------------------------------------------
     */
     
-    'default_model' => env('OLLAMA_DEFAULT_MODEL', 'llama3:8b'),
+    'default_model' => env('OLLAMA_DEFAULT_MODEL', 'gemma3:4b'),
     
     /*
     |--------------------------------------------------------------------------
@@ -31,6 +31,10 @@ return [
         'gemma2:2b' => [
             'context_length' => 8192,
             'description' => 'Компактная модель для быстрых задач',
+        ],
+        'gemma3:4b' => [
+            'context_length' => 8192,
+            'description' => 'Сбалансированная модель с отличным русским языком',
         ],
         'llama3:8b' => [
             'context_length' => 8192,

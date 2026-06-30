@@ -688,7 +688,7 @@
     'fallback_locale' => 'en',
     'faker_locale' => 'en_US',
     'cipher' => 'AES-256-CBC',
-    'key' => 'base64:etvVACs/ZEczov5kkpAdtNI6DAyUvYnu0b+0vsie3nE=',
+    'key' => 'base64:xlDEhWZAOxR3LHYmR+C9h9wbyaa2WMNC4ZgleZAIYqo=',
     'previous_keys' => 
     array (
     ),
@@ -812,6 +812,11 @@
       array (
         'context_length' => 8192,
         'description' => 'Компактная модель для быстрых задач',
+      ),
+      'gemma3:4b' => 
+      array (
+        'context_length' => 8192,
+        'description' => 'Сбалансированная модель с отличным русским языком',
       ),
       'llama3:8b' => 
       array (

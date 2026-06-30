@@ -352,6 +352,26 @@ export const useDocumentStore = defineStore('document', () => {
           content: m.content,
         }))
 
+      // Добавляем вопрос пользователя в историю
+      const userMessage: ChatMessage = {
+        id: Date.now(),
+        role: 'user',
+        content: question,
+        timestamp: new Date(),
+        isStreaming: false,
+      }
+      chatMessages.value.push(userMessage)
+
+      // Создаём временное сообщение ассистента
+      const assistantMessage: ChatMessage = {
+        id: Date.now() + 1,
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+        isStreaming: true,
+      }
+      chatMessages.value.push(assistantMessage)
+
       const response = await fetch(`/api/documents/${id}/chat`, {
         method: 'POST',
         headers: {
@@ -361,6 +381,9 @@ export const useDocumentStore = defineStore('document', () => {
       })
 
       if (!response.ok) {
+        // Удаляем временные сообщения при ошибке
+        chatMessages.value.pop()
+        chatMessages.value.pop()
         throw new Error('Ошибка отправки вопроса')
       }
 
@@ -373,6 +396,7 @@ export const useDocumentStore = defineStore('document', () => {
       const decoder = new TextDecoder('utf-8')
       let lineBuffer = ''
       let dataBuffer = ''
+      let fullText = ''
 
       while (true) {
         const { done, value } = await reader.read()
@@ -383,6 +407,7 @@ export const useDocumentStore = defineStore('document', () => {
             lineBuffer += finalChunk
           }
           processLineBuffer(lineBuffer, dataBuffer, (text) => {
+            fullText += text
             onChunk(text)
           })
           break
@@ -408,6 +433,7 @@ export const useDocumentStore = defineStore('document', () => {
             try {
               const data = JSON.parse(dataBuffer)
               if (data.text) {
+                fullText += data.text
                 onChunk(data.text)
               }
               dataBuffer = ''
@@ -421,6 +447,7 @@ export const useDocumentStore = defineStore('document', () => {
             try {
               const data = JSON.parse(dataBuffer)
               if (data.text) {
+                fullText += data.text
                 onChunk(data.text)
               }
               dataBuffer = ''
@@ -429,6 +456,13 @@ export const useDocumentStore = defineStore('document', () => {
             }
           }
         }
+      }
+
+      // Обновляем сообщение ассистента с полным текстом
+      const lastMsg = chatMessages.value[chatMessages.value.length - 1]
+      if (lastMsg && lastMsg.role === 'assistant') {
+        lastMsg.content = fullText
+        lastMsg.isStreaming = false
       }
 
       isChatStreaming.value = false
@@ -450,19 +484,31 @@ export const useDocumentStore = defineStore('document', () => {
    */
   async function loadChatHistory(id: number): Promise<void> {
     try {
+      console.log('📥 Загрузка истории чата для документа:', id)
       const response = await axios.get(`/api/documents/${id}/chat/history`)
       
-      if (response.data.chats && response.data.chats.length > 0) {
-        chatMessages.value = response.data.chats.map((chat: any, index: number) => ({
+      console.log('📥 Получен ответ от API:', JSON.stringify(response.data))
+      
+      if (response.data && response.data.chats && Array.isArray(response.data.chats) && response.data.chats.length > 0) {
+        chatMessages.value = response.data.chats.map((chat: any) => ({
           id: chat.id,
           role: chat.role as 'user' | 'assistant',
-          content: chat.content,
-          timestamp: new Date(chat.created_at),
+          content: chat.content || '',
+          timestamp: chat.created_at ? new Date(chat.created_at) : new Date(),
           isStreaming: false,
         }))
+        console.log('✅ История загружена, сообщений:', chatMessages.value.length)
+        console.log('📋 Сообщения:', chatMessages.value.map(m => ({ id: m.id, role: m.role, content: m.content.substring(0, 50) })))
+      } else {
+        console.log('⚠️ История пуста или неверный формат')
+        chatMessages.value = []
       }
     } catch (e: any) {
-      console.error('Ошибка загрузки истории чата:', e)
+      console.error('❌ Ошибка загрузки истории чата:', e)
+      if (e.response) {
+        console.error('📡 Статус ответа:', e.response.status)
+        console.error('📡 Данные ответа:', e.response.data)
+      }
       error.value = 'Не удалось загрузить историю чата'
     }
   }

@@ -28,25 +28,6 @@ async function sendMessage() {
   const question = questionInput.value.trim()
   if (!question || documentStore.isChatStreaming) return
 
-  // Добавляем сообщение пользователя
-  const userMessage = {
-    id: Date.now(),
-    role: 'user' as const,
-    content: question,
-    timestamp: new Date(),
-  }
-  documentStore.chatMessages.push(userMessage)
-
-  // Создаём пустое сообщение бота для стриминга
-  const botMessageId = Date.now() + 1
-  documentStore.chatMessages.push({
-    id: botMessageId,
-    role: 'assistant',
-    content: '',
-    timestamp: new Date(),
-    isStreaming: true,
-  })
-
   questionInput.value = ''
 
   try {
@@ -54,21 +35,11 @@ async function sendMessage() {
       props.documentId,
       question,
       (chunk: string) => {
-        const botMsg = documentStore.chatMessages.find(m => m.id === botMessageId)
-        if (botMsg) {
-          botMsg.content += chunk
-        }
+        // Store сам управляет сообщениями
       }
     )
-    // Завершаем стриминг
-    const botMsg = documentStore.chatMessages.find(m => m.id === botMessageId)
-    if (botMsg) {
-      botMsg.isStreaming = false
-    }
   } catch (e) {
     console.error('Chat error:', e)
-    // Удаляем сообщение бота при ошибке
-    documentStore.chatMessages = documentStore.chatMessages.filter(m => m.id !== botMessageId)
   }
 }
 

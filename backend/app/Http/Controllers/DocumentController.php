@@ -10,16 +10,21 @@ use App\Services\OllamaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Redis;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DocumentController extends Controller
 {
+    private readonly string $ollamaBaseUrl;
+    
     public function __construct(
         private readonly FileParserService $parserService,
         private readonly OllamaService $ollamaService,
-    ) {}
+    ) {
+        $this->ollamaBaseUrl = config('ollama.base_url', 'http://ollama:11434');
+    }
     
     /**
      * Загрузка документа
@@ -267,7 +272,7 @@ PROMPT;
                 'timeout' => 120,
             ]);
             
-            $response = $client->post("{$this->baseUrl}/api/generate", [
+            $response = $client->post("{$this->ollamaBaseUrl}/api/generate", [
                 'model' => 'gemma2:2b',
                 'prompt' => $prompt,
                 'system' => "Ты — ассистент по анализу документов. Отвечай на вопросы пользователя по контексту загруженного документа. Будь точен, цитируй конкретные пункты и цифры из текста. Если не знаешь ответа — скажи честно. Пиши строго на русском языке.",

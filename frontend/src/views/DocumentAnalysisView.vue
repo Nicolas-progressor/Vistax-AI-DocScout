@@ -35,7 +35,10 @@ const rightTabs = [
 
 const hasDocuments = computed(() => documentStore.documentList.length > 0)
 
-function handleUploaded(documentId: number) {
+async function handleUploaded(documentId: number) {
+  // Обновляем список документов после загрузки
+  await documentStore.fetchDocumentList()
+  
   showAnalysis.value = true
   activeTab.value = selectedPreset.value === 'free_chat' ? 'chat' : 'analysis'
 }

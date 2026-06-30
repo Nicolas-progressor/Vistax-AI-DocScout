@@ -94,7 +94,7 @@ function onFileSelect(e: Event) {
           Перетащите файл сюда
         </p>
         <p class="text-sm text-gray-500 mt-1">
-          или нажмите для выбора (PDF, TXT, JSON до 10MB)
+          или нажмите для выбора (PDF, DOCX, DOC, TXT, JSON до 10MB)
         </p>
       </div>
 
@@ -106,7 +106,7 @@ function onFileSelect(e: Event) {
       <!-- Hidden File Input -->
       <input
         type="file"
-        accept=".pdf,.txt,.json"
+        accept=".pdf,.txt,.json,.docx,.doc"
         class="hidden"
         @change="onFileSelect"
       />

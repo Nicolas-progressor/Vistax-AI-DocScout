@@ -486,16 +486,19 @@ export const useDocumentStore = defineStore('document', () => {
       const response = await axios.get(`/api/documents/${id}/chat/history`)
       
       if (response.data && response.data.chats && Array.isArray(response.data.chats) && response.data.chats.length > 0) {
-        // Создаём новый массив для принудительного обновления реактивности
-        chatMessages.value = response.data.chats.map((chat: any) => ({
+        // Создаём НОВЫЙ массив для принудительного обновления Vue реактивности
+        const newMessages = response.data.chats.map((chat: any) => ({
           id: chat.id,
           role: chat.role as 'user' | 'assistant',
           content: chat.content || '',
           timestamp: chat.created_at ? new Date(chat.created_at) : new Date(),
           isStreaming: false,
         }))
+        
+        // Принудительное обновление через splice
+        chatMessages.value.splice(0, chatMessages.value.length, ...newMessages)
       } else {
-        chatMessages.value = []
+        chatMessages.value.splice(0, chatMessages.value.length)
       }
     } catch (e: any) {
       console.error('Ошибка загрузки истории чата:', e)

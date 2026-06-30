@@ -131,7 +131,7 @@ function getStatusIcon(docId: number): string {
         >
           <!-- Document Button -->
           <button
-            @click="() => { handleSelect(doc.id); loadAnalysisStatus(doc.id) }"
+            @click="async () => { await handleSelect(doc.id); loadAnalysisStatus(doc.id) }"
             class="flex-1 p-3 pr-10 text-left rounded-lg transition-all hover:bg-gray-50"
             :class="[
               documentStore.currentDocument?.id === doc.id

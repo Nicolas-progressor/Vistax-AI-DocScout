@@ -13,13 +13,14 @@ const isAnalyzing = ref(false)
 const hasError = ref(false)
 const forceShowEmpty = ref(false)
 
-// Проверяем наличие сохранённого анализа (универсальный)
-const savedAnalysis = computed(() => {
-  return documentStore.getSavedAnalysis('universal')
+// Проверяем наличие сохранённого анализа (универсальный) — реактивно!
+const hasSavedAnalysis = computed(() => {
+  return documentStore.savedAnalyses.some(a => a.preset === 'universal')
 })
 
-const hasSavedAnalysis = computed(() => {
-  return documentStore.hasSavedAnalysis('universal')
+const savedAnalysis = computed(() => {
+  const analysis = documentStore.savedAnalyses.find(a => a.preset === 'universal')
+  return analysis?.result_text || null
 })
 
 // Форматирование markdown (базовое)
@@ -45,6 +46,8 @@ async function startAnalysis() {
   streamedText.value = ''
   forceShowEmpty.value = false
   
+  console.log('[AnalysisPanel] startAnalysis called, documentId:', props.documentId, 'savedAnalyses:', documentStore.savedAnalyses.length, 'hasSaved:', hasSavedAnalysis.value)
+  
   // Проверка на валидный documentId
   if (!props.documentId || props.documentId <= 0) {
     console.warn('AnalysisPanel: Invalid documentId', props.documentId)
@@ -55,11 +58,13 @@ async function startAnalysis() {
 
   // Если есть сохранённый анализ, используем его
   if (hasSavedAnalysis.value) {
+    console.log('[AnalysisPanel] hasSavedAnalysis is TRUE, returning early')
     isAnalyzing.value = false
     hasError.value = false
     return
   }
 
+  console.log('[AnalysisPanel] Starting actual analysis...')
   isAnalyzing.value = true
   hasError.value = false
 
@@ -80,12 +85,36 @@ async function startAnalysis() {
 
 // Запускаем анализ при монтировании или изменении documentId
 onMounted(() => {
+  // Полная очистка состояния при монтировании
+  streamedText.value = ''
+  hasError.value = false
+  forceShowEmpty.value = false
+  
+  console.log('[AnalysisPanel] onMounted, documentId:', props.documentId, 'savedAnalyses:', documentStore.savedAnalyses.length)
+  
+  // Принудительно очищаем кэш анализов для этого компонента
+  documentStore.$patch({ savedAnalyses: [] })
+  console.log('[AnalysisPanel] cleared savedAnalyses')
+  
   nextTick(() => {
     startAnalysis()
   })
 })
 
-watch(() => props.documentId, async () => {
+watch(() => props.documentId, async (newId, oldId) => {
+  console.log('[AnalysisPanel] watch documentId:', oldId, '→', newId)
+  
+  // Очищаем состояние при смене документа
+  streamedText.value = ''
+  hasError.value = false
+  forceShowEmpty.value = false
+  
+  // Принудительно очищаем кэш анализов при смене documentId
+  if (newId !== oldId) {
+    documentStore.$patch({ savedAnalyses: [] })
+    console.log('[AnalysisPanel] watch: cleared savedAnalyses')
+  }
+  
   await nextTick()
   startAnalysis()
 })

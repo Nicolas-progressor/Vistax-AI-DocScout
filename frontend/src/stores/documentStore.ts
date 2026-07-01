@@ -64,6 +64,17 @@ export const useDocumentStore = defineStore('document', () => {
   // Computed
   const hasDocument = computed(() => currentDocument.value !== null)
 
+  // Проверка наличия анализа для заданного пресета (реактивное)
+  function checkHasAnalysis(preset: string): boolean {
+    return savedAnalyses.value.some(a => a.preset === preset)
+  }
+  
+  // Получение текста анализа для заданного пресета (реактивное)
+  function checkSavedAnalysis(preset: string): string | null {
+    const analysis = savedAnalyses.value.find(a => a.preset === preset)
+    return analysis?.result_text || null
+  }
+
   // Actions
   async function uploadDocument(file: File): Promise<Document> {
     isLoading.value = true
@@ -107,6 +118,10 @@ export const useDocumentStore = defineStore('document', () => {
         currentDocument.value.cached = response.data.cached
       }
       
+      // Очищаем анализы предыдущего документа — они больше не актуальны
+      savedAnalyses.value = []
+      console.log('[Store] uploadDocument: cleared savedAnalyses for documentId', documentId)
+      
       return response.data
     } catch (e: any) {
       error.value = e.response?.data?.message || 'Ошибка загрузки файла'
@@ -139,10 +154,9 @@ export const useDocumentStore = defineStore('document', () => {
       const response = await axios.get(`/api/documents/${id}`)
       currentDocument.value = response.data
       
-      // Сохраняем анализы если они есть
-      if (response.data.analyses && response.data.analyses.length > 0) {
-        savedAnalyses.value = response.data.analyses
-      }
+      // Всегда обновляем анализы — даже пустой массив означает "нет анализов"
+      savedAnalyses.value = response.data.analyses || []
+      console.log('[Store] fetchDocument(' + id + '): savedAnalyses count =', savedAnalyses.value.length)
     } catch (e: any) {
       error.value = e.response?.data?.message || 'Ошибка загрузки документа'
       throw e
@@ -283,6 +297,7 @@ export const useDocumentStore = defineStore('document', () => {
 
   function reset(): void {
     currentDocument.value = null
+    savedAnalyses.value = []
     analysisResult.value = {
       text: '',
       isStreaming: false,
@@ -506,15 +521,6 @@ export const useDocumentStore = defineStore('document', () => {
     }
   }
 
-  function getSavedAnalysis(preset: string): string | null {
-    const analysis = savedAnalyses.value.find(a => a.preset === preset)
-    return analysis?.result_text || null
-  }
-
-  function hasSavedAnalysis(preset: string): boolean {
-    return savedAnalyses.value.some(a => a.preset === preset)
-  }
-
   async function deleteDocument(id: number): Promise<void> {
     error.value = null
 
@@ -559,8 +565,6 @@ export const useDocumentStore = defineStore('document', () => {
     loadChatHistory,
     reset,
     resetChat,
-    getSavedAnalysis,
-    hasSavedAnalysis,
     deleteDocument,
   }
 })

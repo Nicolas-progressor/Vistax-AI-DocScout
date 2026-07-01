@@ -12,6 +12,7 @@ const showAnalysis = ref(false)
 const activeTab = ref<'analysis' | 'chat'>('analysis')
 const isSidebarCollapsed = ref(false)
 const selectedDocId = ref<number | null>(null)
+const analysisKey = ref(0)  // Для принудительного пересоздания AnalysisPanel
 
 const rightTabs = [
   { id: 'analysis', label: '📊 Результат анализа', icon: '📊' },
@@ -21,6 +22,13 @@ const rightTabs = [
 const hasDocuments = computed(() => documentStore.documentList.length > 0)
 
 async function handleUploaded(documentId: number) {
+  console.log('[View] handleUploaded called for documentId:', documentId)
+  // Очищаем анализы перед загрузкой нового документа
+  documentStore.$patch({ savedAnalyses: [] })
+  console.log('[View] cleared savedAnalyses, analysisKey:', analysisKey.value)
+  analysisKey.value++  // Принудительное пересоздание AnalysisPanel
+  console.log('[View] incremented analysisKey to:', analysisKey.value)
+  
   await documentStore.fetchDocumentList()
   showAnalysis.value = true
   activeTab.value = 'analysis'
@@ -34,6 +42,7 @@ function resetAnalysis() {
   showAnalysis.value = false
   activeTab.value = 'analysis'
   selectedDocId.value = null
+  analysisKey.value = 0
 }
 
 async function handleDocumentSelect() {
@@ -246,13 +255,14 @@ watch(() => documentStore.currentDocument?.id, async (newId) => {
                 <div class="flex-1 min-h-[550px]">
                   <Transition name="fade" mode="out-in">
                     <AnalysisPanel
-                      v-show="activeTab === 'analysis'"
+                      v-if="activeTab === 'analysis'"
+                      :key="analysisKey"
                       :document-id="documentStore.currentDocument?.id || 0"
                     />
                   </Transition>
                   <Transition name="fade" mode="out-in">
                     <ChatPanel
-                      v-show="activeTab === 'chat'"
+                      v-if="activeTab === 'chat'"
                       :key="documentStore.currentDocument?.id || 0"
                       :document-id="documentStore.currentDocument?.id || 0"
                       :is-visible="showAnalysis"
